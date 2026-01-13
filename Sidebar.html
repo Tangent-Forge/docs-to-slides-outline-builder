@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <style>
+      body {
+        font-family: 'Google Sans', Arial, sans-serif;
+        margin: 0;
+        padding: 20px;
+        background-color: #f8f9fa;
+      }
+      .container {
+        max-width: 380px;
+      }
+      h1 {
+        color: #202124;
+        font-size: 24px;
+        margin-bottom: 20px;
+      }
+      .card {
+        background: white;
+        border-radius: 8px;
+        padding: 16px;
+        margin-bottom: 16px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      }
+      .btn {
+        display: block;
+        width: 100%;
+        padding: 12px;
+        margin-bottom: 8px;
+        border: none;
+        border-radius: 4px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background-color 0.2s;
+      }
+      .btn-primary {
+        background-color: #7B1FA2;
+        color: white;
+      }
+      .btn-primary:hover {
+        background-color: #9C27B0;
+      }
+      .btn-secondary {
+        background-color: #f1f3f4;
+        color: #202124;
+      }
+      .btn-secondary:hover {
+        background-color: #e8eaed;
+      }
+      .slide-item {
+        border: 1px solid #dadce0;
+        border-radius: 4px;
+        padding: 12px;
+        margin-bottom: 12px;
+      }
+      .slide-title {
+        font-weight: 600;
+        color: #202124;
+        font-size: 14px;
+        margin-bottom: 8px;
+      }
+      .slide-bullets {
+        font-size: 12px;
+        color: #5f6368;
+        padding-left: 16px;
+      }
+      .slide-bullet {
+        margin-bottom: 4px;
+      }
+      .loading {
+        text-align: center;
+        padding: 40px;
+        color: #5f6368;
+      }
+      .spinner {
+        border: 3px solid #f1f3f4;
+        border-top: 3px solid #7B1FA2;
+        border-radius: 50%;
+        width: 30px;
+        height: 30px;
+        animation: spin 1s linear infinite;
+        margin: 0 auto 16px;
+      }
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+      .error {
+        color: #d93025;
+        padding: 12px;
+        background-color: #fce8e6;
+        border-radius: 4px;
+        margin-bottom: 16px;
+      }
+      .success {
+        color: #188038;
+        padding: 12px;
+        background-color: #ceead6;
+        border-radius: 4px;
+        margin-bottom: 16px;
+      }
+      .empty-state {
+        text-align: center;
+        padding: 40px 20px;
+        color: #5f6368;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>📊 Docs to Slides</h1>
+      
+      <div id="content">
+        <div class="card">
+          <p style="color: #5f6368; margin-bottom: 16px;">
+            Convert Google Docs content into structured Google Slides outlines.
+          </p>
+          <button class="btn btn-primary" onclick="loadOutline()">
+            Generate Outline
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      let currentOutline = null;
+
+      function loadOutline() {
+        const content = document.getElementById('content');
+        content.innerHTML = `
+          <div class="loading">
+            <div class="spinner"></div>
+            <p>Parsing document...</p>
+          </div>
+        `;
+
+        google.script.run
+          .withSuccessHandler(onOutlineLoaded)
+          .withFailureHandler(onLoadError)
+          .apiGetOutline();
+      }
+
+      function onOutlineLoaded(outline) {
+        currentOutline = outline;
+        renderOutline(outline);
+      }
+
+      function renderOutline(outline) {
+        const content = document.getElementById('content');
+        
+        if (outline.slides.length === 0) {
+          content.innerHTML = `
+            <div class="empty-state">
+              <p>📄 No slides generated</p>
+              <p style="font-size: 13px; margin-top: 8px;">
+                No heading content found in this document. Use Heading 1 for slide titles and Heading 2/3 for bullet points.
+              </p>
+            </div>
+            <button class="btn btn-secondary" onclick="loadOutline()">
+              Try Again
+            </button>
+          `;
+          return;
+        }
+        
+        content.innerHTML = `
+          <div class="card">
+            <h3 style="margin: 0 0 16px 0; color: #202124; font-size: 16px;">
+              Outline Preview
+            </h3>
+            <p style="color: #5f6368; font-size: 13px; margin-bottom: 16px;">
+              <strong>Title:</strong> ${outline.title}<br>
+              <strong>Slides:</strong> ${outline.slides.length}
+            </p>
+            ${outline.slides.map(slide => `
+              <div class="slide-item">
+                <div class="slide-title">${slide.title}</div>
+                ${slide.bullets.length > 0 ? `
+                  <div class="slide-bullets">
+                    ${slide.bullets.map(bullet => `
+                      <div class="slide-bullet" style="margin-left: ${bullet.level * 16}px">
+                        • ${bullet.text}
+                      </div>
+                    `).join('')}
+                  </div>
+                ` : ''}
+              </div>
+            `).join('')}
+            <button class="btn btn-primary" onclick="createSlides()">
+              Create Slides
+            </button>
+            <button class="btn btn-secondary" onclick="loadOutline()">
+              Refresh Outline
+            </button>
+          </div>
+        `;
+      }
+
+      function createSlides() {
+        if (!currentOutline || currentOutline.slides.length === 0) {
+          alert('No outline to create slides from.');
+          return;
+        }
+
+        if (!confirm(`Create ${currentOutline.slides.length} slides from this outline?`)) {
+          return;
+        }
+
+        const content = document.getElementById('content');
+        content.innerHTML = `
+          <div class="loading">
+            <div class="spinner"></div>
+            <p>Creating presentation...</p>
+          </div>
+        `;
+
+        google.script.run
+          .withSuccessHandler(onSlidesCreated)
+          .withFailureHandler(onCreateError)
+          .apiCreateSlides(currentOutline, {});
+      }
+
+      function onSlidesCreated(result) {
+        const content = document.getElementById('content');
+        
+        content.innerHTML = `
+          <div class="success">
+            <strong>Success!</strong> Presentation created with ${result.slidesCreated} slides.
+          </div>
+          <div class="card">
+            <p style="color: #5f6368; font-size: 13px; margin-bottom: 8px;">
+              <strong>Presentation URL:</strong> <a href="${result.url}" target="_blank">${result.url}</a>
+            </p>
+          </div>
+          <button class="btn btn-primary" onclick="window.open('${result.url}', '_blank')">
+            Open Presentation
+          </button>
+          <button class="btn btn-secondary" onclick="loadOutline()">
+            Create Another
+          </button>
+        `;
+      }
+
+      function onLoadError(error) {
+        const content = document.getElementById('content');
+        content.innerHTML = `
+          <div class="error">
+            <strong>Error:</strong> ${error.message}
+          </div>
+          <button class="btn btn-secondary" onclick="loadOutline()">
+            Try Again
+          </button>
+        `;
+      }
+
+      function onCreateError(error) {
+        const content = document.getElementById('content');
+        content.innerHTML = `
+          <div class="error">
+            <strong>Error:</strong> ${error.message}
+          </div>
+          <button class="btn btn-secondary" onclick="renderOutline(currentOutline)">
+            Back to Outline
+          </button>
+        `;
+      }
+    </script>
+  </body>
+</html>
